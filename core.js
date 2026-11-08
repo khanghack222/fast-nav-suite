@@ -36,7 +36,7 @@
     // ====================================================
     // MẠNG: NATIVE FETCH (KHÔNG BỊ TAMPERMONKEY CHẶN) + GM_xmlhttpRequest FALLBACK
     // ====================================================
-    function nativeFetch(url, method = "GET", headers = {}, data = null) {
+    async function nativeFetch(url, method = "GET", headers = {}, data = null) {
         const safeHeaders = {};
         for (let k in headers) {
             const lk = k.toLowerCase();
@@ -45,11 +45,22 @@
             }
         }
         const fetchFunc = (typeof unsafeWindow !== "undefined" && unsafeWindow.fetch) ? unsafeWindow.fetch : window.fetch;
-        return fetchFunc(url, {
+        const res = await fetchFunc(url, {
             method,
             headers: safeHeaders,
             body: data
-        }).then(r => r.json().catch(() => r.text()));
+        });
+        let body = null;
+        try {
+            body = await res.json();
+        } catch(e) {
+            try { body = await res.text(); } catch(err) { body = null; }
+        }
+        if (!res.ok) {
+            let msg = (body && typeof body === "object" && body.message) ? body.message : (typeof body === "string" ? body : `HTTP ${res.status}`);
+            throw new Error(msg);
+        }
+        return body;
     }
 
     function sendReq(url, method = "GET", headers = {}, data = null) {
@@ -624,6 +635,48 @@
             } catch(e) { return null; }
         }
 
+        async function getMadiumHeaders() {
+            try {
+                let devId = localStorage.getItem("madium_device_v1");
+                if (!devId || !/^[a-zA-Z0-9_-]{16,128}$/.test(devId)) {
+                    devId = crypto.randomUUID().replace(/[^a-zA-Z0-9_-]/g, "");
+                    localStorage.setItem("madium_device_v1", devId);
+                }
+                const nav = navigator;
+                let highEntropy = {};
+                try {
+                    highEntropy = await nav.userAgentData?.getHighEntropyValues?.(["architecture", "bitness", "model", "platformVersion", "uaFullVersion"]) ?? {};
+                } catch(e) {}
+
+                const fpObj = {
+                    userAgent: nav.userAgent,
+                    platform: nav.platform,
+                    languages: nav.languages,
+                    hardwareConcurrency: nav.hardwareConcurrency,
+                    deviceMemory: nav.deviceMemory ?? null,
+                    maxTouchPoints: nav.maxTouchPoints,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    screen: [screen.width, screen.height, screen.availWidth, screen.availHeight, screen.colorDepth],
+                    pixelRatio: window.devicePixelRatio,
+                    brands: nav.userAgentData?.brands ?? [],
+                    mobile: nav.userAgentData?.mobile ?? null,
+                    uaPlatform: nav.userAgentData?.platform ?? "",
+                    highEntropy: highEntropy
+                };
+
+                const enc = new TextEncoder().encode(JSON.stringify(fpObj));
+                const digest = await crypto.subtle.digest("SHA-256", enc);
+                const fpHash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+
+                return {
+                    "X-Madium-Device": devId,
+                    "X-Madium-Fingerprint": fpHash
+                };
+            } catch(e) {
+                return {};
+            }
+        }
+
         async function initMadium() {
             const token = localStorage.getItem("mad_token");
             if (!token) {
@@ -636,7 +689,7 @@
                 // Tự động bỏ qua 3 bước bắt buộc 30 giây (Wyv, Like Youtube, Sub Youtube)
                 try {
                     sessionStorage.setItem("mad_lootlabs_intro", userId);
-                    log("Đã bỏ qua 3 nhiệm vụ chờ mạng xã hội của Madium.");
+                    log("Đã bỏ qua 3 nhiệm vụ mạng xã hội của Madium.");
                 } catch(e) {}
             }
 
@@ -647,14 +700,16 @@
                 try { pendingData = JSON.parse(localStorage.getItem(pendingKey) || "null"); } catch(e) {}
 
                 if (pendingData && pendingData.clickId && pendingData.expiresAt > Date.now()) {
-                    showToast("Madium Checkpoint", "LootLabs đã xong! Đang kiểm tra xác nhận key...", true);
+                    showToast("Madium Checkpoint", "LootLabs đã hoàn tất! Đang gửi xác nhận cộng giờ...", true);
                     log("Phát hiện phiên pending:", pendingData);
 
+                    const madHeaders = await getMadiumHeaders();
                     // Kiểm tra xác thực tới 10 lần
                     for (let t = 0; t < 10; t++) {
-                        if (t > 0) await new Promise(r => setTimeout(r, 2000));
+                        if (t > 0) await new Promise(r => setTimeout(r, 2500));
                         try {
                             const res = await nativeFetch(`https://auth.getmadium.xyz/getkey/lootlabs/status?click_id=${encodeURIComponent(pendingData.clickId)}`, "GET", {
+                                ...madHeaders,
                                 "Authorization": `Bearer ${token}`
                             });
                             log("Status check:", res);
@@ -670,7 +725,11 @@
                                 return;
                             } else if (res && res.status === "already_stocked") {
                                 localStorage.removeItem(pendingKey);
-                                showToast("Thông báo", "Tài khoản của bạn vẫn còn thời hạn key!", true);
+                                showToast("Thông báo", "Tài khoản của bạn hiện vẫn còn thời gian key!", true);
+                                return;
+                            } else if (res && res.status === "expired") {
+                                localStorage.removeItem(pendingKey);
+                                showToast("Phiên hết hạn", "Phiên LootLabs đã hết hạn, vui lòng bắt đầu lại.", false);
                                 return;
                             }
                         } catch(err) {
@@ -685,7 +744,7 @@
                 if (document.getElementById("madium-fastnav-panel")) return;
                 const panel = document.createElement("div");
                 panel.id = "madium-fastnav-panel";
-                panel.style.cssText = "position:fixed;bottom:20px;right:20px;z-index:99999;background:rgba(15,23,42,0.92);border:1.5px solid #22c55e;border-radius:12px;padding:12px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.8);display:flex;flex-direction:column;gap:8px;font-family:-apple-system,sans-serif;";
+                panel.style.cssText = "position:fixed;bottom:20px;right:20px;z-index:99999;background:rgba(15,23,42,0.95);border:1.5px solid #22c55e;border-radius:12px;padding:12px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.8);display:flex;flex-direction:column;gap:8px;font-family:-apple-system,sans-serif;";
                 
                 const title = document.createElement("div");
                 title.style.cssText = "color:#f8fafc;font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;";
@@ -717,7 +776,7 @@
         async function startLootlabsKey(platform = "windows") {
             const token = localStorage.getItem("mad_token");
             if (!token) {
-                alert("Vui lòng đăng nhập tài khoản Madium trước khi nhận key!");
+                showToast("Chưa đăng nhập", "Vui lòng đăng nhập Madium trước khi nhận key!");
                 return;
             }
             const userId = getUserIdFromToken(token);
@@ -727,7 +786,9 @@
 
             showToast("Madium Auto-Key", `Đang khởi tạo LootLabs (${platform})...`);
             try {
+                const madHeaders = await getMadiumHeaders();
                 const res = await nativeFetch("https://auth.getmadium.xyz/getkey/lootlabs/start", "POST", {
+                    ...madHeaders,
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 }, JSON.stringify({ platform }));
@@ -748,11 +809,12 @@
                         window.location.href = res.url;
                     }, 500);
                 } else {
-                    showToast("Lỗi bắt đầu", res?.message || JSON.stringify(res));
+                    const msg = (typeof res === "string" ? res : (res?.message || JSON.stringify(res)));
+                    showToast("Lỗi bắt đầu", msg);
                 }
             } catch(e) {
                 logErr("Lỗi khởi tạo Lootlabs:", e);
-                showToast("Lỗi", e.message || String(e));
+                showToast("Lỗi bắt đầu", e.message || String(e));
             }
         }
 
