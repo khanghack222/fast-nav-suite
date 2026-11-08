@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FastNav Suite Pro - Direct Navigation Helper
 // @namespace    http://tampermonkey.net/
-// @version      1.1.3
+// @version      1.2.0
 // @description  Tự động hỗ trợ điều hướng và giải quyết liên kết đích mượt mà.
 // @author       khanghack222
 // @match        *://*.linkvertise.com/*
@@ -26,9 +26,18 @@
 // @match        *://pass.work.ink/*
 // @match        *://keys.combowick.com/*
 // @match        *://combowick.com/*
+// @match        *://app.getmadium.xyz/*
+// @match        https://links.lootlabs.gg/*
+// @match        https://*.lootlabs.gg/*
+// @match        https://nerventualken.com/*
 // @connect      *
 // @connect      sqahviibykrzlwnulgmw.supabase.co
 // @connect      publisher.linkvertise.com
+// @connect      auth.getmadium.xyz
+// @connect      enaightdecipie.com
+// @connect      onsultingco.com
+// @connect      nismscoldnesfspu.org
+// @connect      nerventualken.com
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setClipboard
 // @grant        unsafeWindow

@@ -605,4 +605,404 @@
             setTimeout(runComboWickEngine, 300);
         }
     }
+
+    // ====================================================
+    // MODULE 4: MADIUM (app.getmadium.xyz) AUTO-KEY & INTRO BYPASS
+    // ====================================================
+    if (host.includes("getmadium.xyz")) {
+        log("Kích hoạt Madium Engine trên app.getmadium.xyz");
+
+        function getUserIdFromToken(tok) {
+            try {
+                if (!tok) return null;
+                const p = tok.split('.')[1];
+                if (!p) return null;
+                const pad = '='.repeat((4 - p.length % 4) % 4);
+                const json = atob(p + pad);
+                const data = JSON.parse(json);
+                return data.id || data.sub || data.user_id || null;
+            } catch(e) { return null; }
+        }
+
+        async function initMadium() {
+            const token = localStorage.getItem("mad_token");
+            if (!token) {
+                log("Chưa đăng nhập Madium, vui lòng đăng nhập.");
+                return;
+            }
+
+            const userId = getUserIdFromToken(token);
+            if (userId) {
+                // Tự động bỏ qua 3 bước bắt buộc 30 giây (Wyv, Like Youtube, Sub Youtube)
+                try {
+                    sessionStorage.setItem("mad_lootlabs_intro", userId);
+                    log("Đã bỏ qua 3 nhiệm vụ chờ mạng xã hội của Madium.");
+                } catch(e) {}
+            }
+
+            // Kiểm tra xem vừa từ LootLabs quay về hay không
+            if (userId) {
+                const pendingKey = `mad_lootlabs_pending:${userId}`;
+                let pendingData = null;
+                try { pendingData = JSON.parse(localStorage.getItem(pendingKey) || "null"); } catch(e) {}
+
+                if (pendingData && pendingData.clickId && pendingData.expiresAt > Date.now()) {
+                    showToast("Madium Checkpoint", "LootLabs đã xong! Đang kiểm tra xác nhận key...", true);
+                    log("Phát hiện phiên pending:", pendingData);
+
+                    // Kiểm tra xác thực tới 10 lần
+                    for (let t = 0; t < 10; t++) {
+                        if (t > 0) await new Promise(r => setTimeout(r, 2000));
+                        try {
+                            const res = await nativeFetch(`https://auth.getmadium.xyz/getkey/lootlabs/status?click_id=${encodeURIComponent(pendingData.clickId)}`, "GET", {
+                                "Authorization": `Bearer ${token}`
+                            });
+                            log("Status check:", res);
+                            if (res && res.status === "credited") {
+                                localStorage.removeItem(pendingKey);
+                                showToast("Thành công tuyệt đối", `Đã cộng ${res.creditedHours || 24}h vào tài khoản Madium!`, true);
+                                setTimeout(() => window.location.reload(), 1500);
+                                return;
+                            } else if (res && res.status === "step_done") {
+                                showToast("Checkpoint hoàn tất", `Bước ${res.completedSteps} đã xong. Đang mở bước tiếp theo...`, true);
+                                localStorage.removeItem(pendingKey);
+                                setTimeout(() => startLootlabsKey(pendingData.platform || "windows"), 1200);
+                                return;
+                            } else if (res && res.status === "already_stocked") {
+                                localStorage.removeItem(pendingKey);
+                                showToast("Thông báo", "Tài khoản của bạn vẫn còn thời hạn key!", true);
+                                return;
+                            }
+                        } catch(err) {
+                            logErr("Lỗi check status:", err);
+                        }
+                    }
+                }
+            }
+
+            // Tạo nút bấm hỗ trợ nhanh trên giao diện
+            function createMadiumPanel() {
+                if (document.getElementById("madium-fastnav-panel")) return;
+                const panel = document.createElement("div");
+                panel.id = "madium-fastnav-panel";
+                panel.style.cssText = "position:fixed;bottom:20px;right:20px;z-index:99999;background:rgba(15,23,42,0.92);border:1.5px solid #22c55e;border-radius:12px;padding:12px 16px;box-shadow:0 10px 30px rgba(0,0,0,0.8);display:flex;flex-direction:column;gap:8px;font-family:-apple-system,sans-serif;";
+                
+                const title = document.createElement("div");
+                title.style.cssText = "color:#f8fafc;font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;";
+                title.innerHTML = "<span style='color:#22c55e;'>⚡</span> FastNav LootLabs Auto-Key";
+                panel.appendChild(title);
+
+                const btnRow = document.createElement("div");
+                btnRow.style.cssText = "display:flex;gap:8px;";
+
+                const btnWin = document.createElement("button");
+                btnWin.textContent = "Nhận Key Windows";
+                btnWin.style.cssText = "background:#22c55e;color:#0f172a;font-weight:700;font-size:12px;padding:6px 12px;border:none;border-radius:6px;cursor:pointer;";
+                btnWin.onclick = () => startLootlabsKey("windows");
+
+                const btnAnd = document.createElement("button");
+                btnAnd.textContent = "Nhận Key Android";
+                btnAnd.style.cssText = "background:#3b82f6;color:#ffffff;font-weight:700;font-size:12px;padding:6px 12px;border:none;border-radius:6px;cursor:pointer;";
+                btnAnd.onclick = () => startLootlabsKey("android");
+
+                btnRow.appendChild(btnWin);
+                btnRow.appendChild(btnAnd);
+                panel.appendChild(btnRow);
+                document.body.appendChild(panel);
+            }
+
+            createMadiumPanel();
+        }
+
+        async function startLootlabsKey(platform = "windows") {
+            const token = localStorage.getItem("mad_token");
+            if (!token) {
+                alert("Vui lòng đăng nhập tài khoản Madium trước khi nhận key!");
+                return;
+            }
+            const userId = getUserIdFromToken(token);
+            try {
+                if (userId) sessionStorage.setItem("mad_lootlabs_intro", userId);
+            } catch(e) {}
+
+            showToast("Madium Auto-Key", `Đang khởi tạo LootLabs (${platform})...`);
+            try {
+                const res = await nativeFetch("https://auth.getmadium.xyz/getkey/lootlabs/start", "POST", {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                }, JSON.stringify({ platform }));
+                
+                log("Kết quả start LootLabs:", res);
+                if (res && res.url && res.clickId) {
+                    if (userId) {
+                        try {
+                            localStorage.setItem(`mad_lootlabs_pending:${userId}`, JSON.stringify({
+                                clickId: res.clickId,
+                                expiresAt: res.expiresAt,
+                                platform
+                            }));
+                        } catch(e) {}
+                    }
+                    showToast("Chuyển hướng", "Đang mở LootLabs để tự động vượt...", true);
+                    setTimeout(() => {
+                        window.location.href = res.url;
+                    }, 500);
+                } else {
+                    showToast("Lỗi bắt đầu", res?.message || JSON.stringify(res));
+                }
+            } catch(e) {
+                logErr("Lỗi khởi tạo Lootlabs:", e);
+                showToast("Lỗi", e.message || String(e));
+            }
+        }
+
+        if (document.readyState === "loading") {
+            window.addEventListener("DOMContentLoaded", () => setTimeout(initMadium, 400));
+        } else {
+            setTimeout(initMadium, 400);
+        }
+    }
+
+    // ====================================================
+    // MODULE 5: LOOTLABS INSTANT SOLVER (links.lootlabs.gg / *.lootlabs.gg)
+    // ====================================================
+    if (host.includes("lootlabs.gg")) {
+        log("Kích hoạt LootLabs Instant Solver Engine");
+        showToast("LootLabs Bypass", "Đang tự động bóc tách và giải quyết nhiệm vụ...");
+
+        function decryptLootDestination(dataStr, keyLen = 5) {
+            try {
+                const clean = dataStr.trim().replace(/[^A-Za-z0-9+/=]/g, '');
+                const binary = atob(clean);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                const key = bytes.slice(0, keyLen);
+                const payload = bytes.slice(keyLen);
+                const out = new Uint8Array(payload.length);
+                for (let i = 0; i < payload.length; i++) {
+                    out[i] = payload[i] ^ key[i % keyLen];
+                }
+                return new TextDecoder('utf-8').decode(out).trim();
+            } catch(e) {
+                logErr("Lỗi giải mã đích LootLabs:", e);
+                return dataStr.trim();
+            }
+        }
+
+        // Can thiệp vào fetch của window / unsafeWindow để ép max_tasks = 1 và đọc /tc
+        const targetWindow = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
+        const origFetch = targetWindow.fetch;
+
+        targetWindow.fetch = async function(...args) {
+            const [resource, config = {}] = args;
+            const url = typeof resource === 'string' ? resource : resource?.url || '';
+
+            // 1. Ép /tc chỉ yêu cầu 1 task duy nhất
+            if (config.method && config.method.toUpperCase() === 'POST' && url.endsWith('/tc')) {
+                let body = config.body;
+                if (body) {
+                    try {
+                        const parsed = typeof body === "string" ? JSON.parse(body) : body;
+                        if (parsed && typeof parsed === 'object' && 'max_tasks' in parsed) {
+                            parsed.max_tasks = 1;
+                            parsed.num_of_tasks = '1';
+                            parsed.bl = [18, 2, 33, 7, 21, 49];
+                            parsed.tier_id = parsed.tier_id || '0';
+                            parsed.taboola_user_sync = '0';
+                            config.body = JSON.stringify(parsed);
+                            log("Đã tiêm tối giản 1 task vào /tc request");
+                        }
+                    } catch(e) {}
+                }
+            }
+
+            const response = await origFetch.apply(this, args);
+
+            // 2. Bắt response của /tc
+            if (url.includes('/tc')) {
+                try {
+                    const clone = response.clone();
+                    const data = await clone.json();
+                    log("Đã bắt được danh sách nhiệm vụ /tc:", data);
+                    handleLootlabsTasks(data);
+                } catch(e) {
+                    logErr("Lỗi parse /tc response:", e);
+                }
+            }
+
+            return response;
+        };
+
+        function handleLootlabsTasks(data) {
+            if (!Array.isArray(data) || data.length === 0) return;
+
+            // Kích hoạt postbacks
+            data.filter(t => typeof t?.postback_url === 'string').forEach(t => {
+                log("Gửi postback:", t.postback_url);
+                nativeFetch(t.postback_url, "GET").catch(() => {});
+            });
+
+            // Tìm task captcha hoặc dùng task đầu
+            const captchaTask = data.find(t => t?.ad_url && typeof t.ad_url === 'string' && t.ad_url.includes('nerventualken.com/captcha'));
+            const targetTask = captchaTask || data[0];
+
+            let { urid, task_id, action_pixel_url, session_id } = targetTask;
+            let sessionId = session_id || targetWindow.p?.SESSION || targetWindow.conf_rew?.session || '';
+            let key = targetWindow.KEY || targetWindow.conf_rew?.key || targetWindow.p?.KEY || '';
+            let tid = targetWindow.TID || targetWindow.conf_rew?.cd || targetWindow.p?.TID || '0';
+
+            // Gửi sự kiện click
+            data.forEach((t, idx) => {
+                if (t.task_id) {
+                    nativeFetch(`https://enaightdecipie.com/?event=task_clicked&session_id=${t.task_id}&info=${idx + 1}`).catch(() => {});
+                }
+            });
+
+            const subId = parseInt(String(urid).slice(-5)) % 3;
+            const serverDomain = typeof targetWindow.INCENTIVE_SERVER_DOMAIN !== 'undefined' ? targetWindow.INCENTIVE_SERVER_DOMAIN : 'onsultingco.com';
+            const syncerDomain = typeof targetWindow.INCENTIVE_SYNCER_DOMAIN !== 'undefined' ? targetWindow.INCENTIVE_SYNCER_DOMAIN : 'nismscoldnesfspu.org';
+            const isLoot = location.href.includes('loot') ? '1' : '0';
+
+            const wsUrl = `wss://${subId}.${serverDomain}/c?uid=${urid}&cat=${task_id}&key=${key}&session_id=${sessionId}&is_loot=${isLoot}&tid=${tid}`;
+            log("Kết nối LootLabs WebSocket:", wsUrl);
+            showToast("LootLabs Bypass", "Đang xử lý kết nối máy chủ xác thực...");
+
+            let captchaUrl = targetTask.ad_url || '';
+            if (captchaUrl.startsWith('//')) captchaUrl = 'https:' + captchaUrl;
+            if (!captchaUrl.startsWith('http')) captchaUrl = 'https://nerventualken.com/captcha?urid=' + urid;
+
+            setupLootlabsWS(wsUrl, captchaUrl, urid, task_id, tid);
+
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(`https://${subId}.${serverDomain}/st?uid=${urid}&cat=${task_id}`);
+            }
+            if (action_pixel_url) {
+                nativeFetch(action_pixel_url.startsWith('//') ? 'https:' + action_pixel_url : action_pixel_url).catch(() => {});
+            }
+            nativeFetch(`https://${syncerDomain}/td?ac=auto_complete&urid=${urid}&cat=${task_id}&tid=${tid}`).catch(() => {});
+        }
+
+        function setupLootlabsWS(wsUrl, captchaUrl, urid, taskId, tid) {
+            // Nhúng iframe giải captcha ngầm hoặc hiển thị nhỏ gọn
+            let iframe = document.getElementById("lootlabs-captcha-frame");
+            if (!iframe) {
+                iframe = document.createElement("iframe");
+                iframe.id = "lootlabs-captcha-frame";
+                iframe.src = captchaUrl;
+                iframe.style.cssText = "position:fixed;bottom:10px;left:10px;width:320px;height:120px;z-index:999999;border:1px solid #10b981;border-radius:10px;background:#0f172a;box-shadow:0 10px 30px rgba(0,0,0,0.8);";
+                (document.body || document.documentElement).appendChild(iframe);
+            }
+
+            const ws = new WebSocket(wsUrl);
+            let pingTimer = null;
+
+            ws.onopen = () => {
+                log("WebSocket LootLabs đã mở, gửi ping giữ nhịp");
+                pingTimer = setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send('0');
+                        log("LootLabs ping sent");
+                    }
+                }, 10000);
+            };
+
+            ws.onclose = () => {
+                log("WebSocket LootLabs đã đóng");
+                if (pingTimer) clearInterval(pingTimer);
+            };
+
+            ws.onerror = (err) => {
+                logErr("WebSocket LootLabs gặp lỗi:", err);
+                if (pingTimer) clearInterval(pingTimer);
+            };
+
+            ws.onmessage = async (msg) => {
+                log("WebSocket LootLabs nhận tin nhắn:", msg.data);
+                if (typeof msg.data === 'string' && msg.data.startsWith('r:')) {
+                    const cleanRaw = msg.data.replace(/^r:/, '').trim();
+                    const destUrl = decryptLootDestination(cleanRaw, 5);
+                    log("ĐÃ GIẢI MÃ THÀNH CÔNG LINK ĐÍCH:", destUrl);
+                    showToast("Thành công!", "Đã mở khóa đích, đang chuyển hướng...", true);
+                    ws.close();
+                    if (iframe) iframe.remove();
+                    if (destUrl && destUrl.startsWith('http')) {
+                        setTimeout(() => {
+                            window.location.replace(destUrl);
+                        }, 500);
+                    }
+                }
+            };
+
+            // Lắng nghe message từ iframe captcha
+            window.addEventListener("message", function onCaptchaMessage(evt) {
+                if (!evt.origin || !evt.origin.includes("nerventualken.com")) return;
+                const d = evt.data;
+                log("Tin nhắn từ Captcha Iframe:", d);
+                if (d === 'ok' || d === 'solved' || (typeof d === 'object' && d?.solved)) {
+                    log("Captcha Turnstile đã giải quyết thành công!");
+                    showToast("LootLabs", "Captcha đã giải! Đang đợi máy chủ cấp link đích...");
+                    nativeFetch(`https://nerventualken.com/td?ac=captcha&urid=${urid}&cat=${taskId}&tid=${tid}`).catch(() => {});
+                }
+            });
+        }
+    }
+
+    // ====================================================
+    // MODULE 6: CLOUDFLARE TURNSTILE AUTO-SOLVER (nerventualken.com)
+    // ====================================================
+    if (host.includes("nerventualken.com")) {
+        log("Kích hoạt Turnstile Auto-Submitter trên nerventualken.com");
+        let submitted = false;
+
+        async function submitTurnstileToken(token) {
+            if (submitted || !token) return;
+            submitted = true;
+            const params = new URLSearchParams(window.location.search);
+            const urid = params.get('urid') || '';
+            log("Đang tự động gửi token Turnstile xác thực:", { urid, token });
+            try {
+                await nativeFetch('https://nerventualken.com/captcha/verify', 'POST', {
+                    'Content-Type': 'application/json'
+                }, JSON.stringify({ urid, token }));
+                log("Gửi /captcha/verify thành công!");
+            } catch(e) {
+                logErr("Lỗi gửi /captcha/verify:", e);
+            }
+            if (window.parent) {
+                window.parent.postMessage({ type: 'captcha_solved', solved: true, status: 'ok', urid }, '*');
+            }
+        }
+
+        let origTurnstile = window.turnstile;
+        Object.defineProperty(window, 'turnstile', {
+            configurable: true,
+            get() { return origTurnstile; },
+            set(v) {
+                origTurnstile = v;
+                if (origTurnstile && typeof origTurnstile.render === 'function') {
+                    const origRender = origTurnstile.render;
+                    origTurnstile.render = function(container, opt) {
+                        const origCb = opt?.callback;
+                        if (opt) {
+                            opt.callback = function(tok) {
+                                submitTurnstileToken(tok);
+                                if (typeof origCb === 'function') origCb.apply(this, arguments);
+                            };
+                        }
+                        return origRender.apply(this, arguments);
+                    };
+                }
+            }
+        });
+
+        const turnstileWatcher = setInterval(() => {
+            const input = document.querySelector('input[name="cf-turnstile-response"]');
+            if (input && input.value) {
+                clearInterval(turnstileWatcher);
+                submitTurnstileToken(input.value);
+            }
+        }, 250);
+    }
 })();
