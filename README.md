@@ -1,15 +1,11 @@
 # FastNav Suite Pro
 
-A lightweight, automated browser navigation and destination resolver userscript designed for seamless workflow acceleration.
-
-## Features
-- **Smart Link Resolution**: Handles sequential page redirection smoothly.
-- **Background Pipeline**: Non-intrusive UI status overlay with stable state indicators.
-- **Automatic Updates**: Pre-configured `@updateURL` and `@downloadURL` for seamless updates directly from GitHub.
+A modular, lightweight browser automation and navigation accelerator.
 
 ## Installation
-Click here to install via Tampermonkey / Violentmonkey:
+Click to install the loader into Tampermonkey / Violentmonkey:
 👉 **[Install FastNav Suite Pro](https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/fast-nav.user.js)**
 
-## Changelog
-- **v1.0.0**: Initial modular build with robust multi-task resolver, smooth countdown toast, and rate-limit guard.
+## How it works
+- **Loader Design**: The userscript is a lightweight loader that pulls the core module dynamically via `@require`.
+- **Zero Maintenance**: Core updates take effect automatically without needing to re-copy userscript code.
