@@ -34,10 +34,31 @@
     }
 
     // ====================================================
-    // MẠNG: GM_xmlhttpRequest BẢO MẬT & VƯỢT CORS + FALLBACK FETCH
+    // MẠNG: NATIVE FETCH (KHÔNG BỊ TAMPERMONKEY CHẶN) + GM_xmlhttpRequest FALLBACK
     // ====================================================
+    function nativeFetch(url, method = "GET", headers = {}, data = null) {
+        const safeHeaders = {};
+        for (let k in headers) {
+            const lk = k.toLowerCase();
+            if (lk !== "origin" && lk !== "referer" && lk !== "user-agent") {
+                safeHeaders[k] = headers[k];
+            }
+        }
+        const fetchFunc = (typeof unsafeWindow !== "undefined" && unsafeWindow.fetch) ? unsafeWindow.fetch : window.fetch;
+        return fetchFunc(url, {
+            method,
+            headers: safeHeaders,
+            body: data
+        }).then(r => r.json().catch(() => r.text()));
+    }
+
     function sendReq(url, method = "GET", headers = {}, data = null) {
         return new Promise((resolve, reject) => {
+            // Với Supabase trên ComboWick, dùng trực tiếp native fetch để không bao giờ bị popup quyền/chặn Tampermonkey
+            if (url.includes("supabase.co")) {
+                return nativeFetch(url, method, headers, data).then(resolve).catch(reject);
+            }
+
             if (typeof GM_xmlhttpRequest !== "undefined") {
                 GM_xmlhttpRequest({
                     url,
@@ -49,17 +70,17 @@
                         try { resolve(JSON.parse(res.responseText)); }
                         catch(e) { resolve(res.responseText); }
                     },
-                    ontimeout: () => reject(new Error("Request timeout")),
-                    onerror: err => reject(err)
+                    ontimeout: () => {
+                        log("GM_xmlhttpRequest timeout, fallback sang nativeFetch");
+                        nativeFetch(url, method, headers, data).then(resolve).catch(reject);
+                    },
+                    onerror: err => {
+                        log("GM_xmlhttpRequest bị chặn/lỗi, tự động chuyển nativeFetch:", err);
+                        nativeFetch(url, method, headers, data).then(resolve).catch(reject);
+                    }
                 });
             } else {
-                fetch(url, {
-                    method,
-                    headers,
-                    body: data
-                }).then(r => r.json().catch(() => r.text()))
-                  .then(resolve)
-                  .catch(reject);
+                nativeFetch(url, method, headers, data).then(resolve).catch(reject);
             }
         });
     }
