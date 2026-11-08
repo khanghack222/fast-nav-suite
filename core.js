@@ -346,17 +346,57 @@
     }
 
     // ====================================================
-    // MODULE 3: COMBOWICK COMPLETE AUTO-SOLVER
+    // MODULE 3: COMBOWICK COMPLETE AUTO-SOLVER (HARDENED)
     // ====================================================
     if (host.includes("combowick.com")) {
         log("Kích hoạt ComboWick Engine trên combowick.com");
+
+        // 1. Tự động ngụy trang document.referrer thuộc hệ thống Linkvertise
+        try {
+            Object.defineProperty(document, 'referrer', {
+                get: function() { return 'https://link-to.net/'; },
+                configurable: true
+            });
+        } catch(e) {}
+
+        // 2. Nếu đang ở trang /access-key -> Đã hoàn thành, dừng
         if (window.location.pathname.includes("/access-key")) {
-            log("Đang ở trang /access-key, dừng solver.");
+            log("Đang ở trang /access-key, dừng engine.");
+            return;
+        }
+
+        // 3. Nếu bị chuyển vào trang /blocked -> Tự động khôi phục về bước trước
+        if (window.location.pathname.includes("/blocked")) {
+            log("Phát hiện trang cảnh báo bảo mật /blocked. Đang tự động gỡ và tiếp tục...");
+            showToast("Bảo mật phát hiện", "Đang tự động khôi phục phiên xác thực an toàn...", true);
+            try {
+                localStorage.removeItem("verification_step");
+            } catch(e) {}
+            setTimeout(() => {
+                const params = new URLSearchParams(window.location.search);
+                const redir = params.get("redirect") || "/verify/step1";
+                log("Chuyển hướng về:", redir);
+                window.location.replace(redir);
+            }, 1200);
+            return;
+        }
+
+        // 4. Nếu ở trang /ad-return -> Trang đang tự xử lý hash, tránh xung đột
+        if (window.location.pathname.includes("/ad-return")) {
+            log("Đang ở trang /ad-return, nhường trình duyệt xử lý hash...");
             return;
         }
 
         const SUPABASE_URL = "https://sqahviibykrzlwnulgmw.supabase.co/functions/v1/issue-verify-token";
         const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxYWh2aWlieWtyemx3bnVsZ213Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyODAxNjQsImV4cCI6MjEwMzg1NjE2NH0.mvRGR-d3EOcy8bBlCTDwIHEF4ELIU9PfVXDi8NSALlA";
+
+        function formatErr(err) {
+            if (!err) return "Lỗi không xác định";
+            if (typeof err === "string") return err;
+            if (err.reason) return err.reason;
+            if (err.message) return err.message;
+            try { return JSON.stringify(err); } catch(e) { return String(err); }
+        }
 
         function callSupabase(payload, referer) {
             log("Gửi Supabase:", JSON.stringify(payload), "Referer:", referer);
@@ -365,7 +405,7 @@
                 "apikey": ANON_KEY,
                 "Authorization": `Bearer ${ANON_KEY}`,
                 "Origin": "https://keys.combowick.com",
-                "Referer": referer
+                "Referer": referer || "https://keys.combowick.com/verify/step1"
             }, JSON.stringify(payload));
         }
 
@@ -388,50 +428,52 @@
             return "";
         }
 
-        // Tự động kích hoạt bấm nút Checkpoint khi hết countdown nếu Linkvertise có cooldown
+        // Tự động kích hoạt bấm nút Checkpoint khi hết video 7 giây nếu cần làm thủ công
         function startAutoClickWatcher() {
             log("Bật watcher tự động bấm nút Checkpoint...");
-            setInterval(() => {
+            const timer = setInterval(() => {
                 const btns = Array.from(document.querySelectorAll('button'));
                 const continueBtn = btns.find(b => {
                     const txt = b.textContent.toLowerCase();
                     return (txt.includes("tiếp tục") || txt.includes("continue")) && !b.disabled;
                 });
                 if (continueBtn) {
+                    clearInterval(timer);
                     log("Phát hiện nút Checkpoint khả dụng! Tự động nhấn...");
                     showToast("Tự động tiếp tục", "Đang chuyển sang bước quảng cáo...", true);
                     continueBtn.click();
                 }
-            }, 600);
+            }, 500);
         }
 
         async function runComboWickEngine() {
             try {
                 showToast("ComboWick Auto-Access", "Đang khởi tạo phiên làm việc an toàn...");
 
-                // Tạo 32-ký tự HEX hợp lệ chuẩn Supabase session
-                const sidBytes = new Uint8Array(16);
-                crypto.getRandomValues(sidBytes);
-                const sid = Array.from(sidBytes).map(b => b.toString(16).padStart(2, "0")).join("");
-                log("Đã sinh SID hex:", sid);
-
-                try {
-                    localStorage.setItem("verify_sid", sid);
-                    localStorage.setItem("selected_ad_provider", "linkvertise");
-                } catch(e) {}
+                // Đọc hoặc sinh 32-ký tự HEX hợp lệ chuẩn Supabase session
+                let sid = localStorage.getItem("verify_sid");
+                if (!sid || sid.length !== 32) {
+                    const sidBytes = new Uint8Array(16);
+                    crypto.getRandomValues(sidBytes);
+                    sid = Array.from(sidBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+                    try { localStorage.setItem("verify_sid", sid); } catch(e) {}
+                }
+                try { localStorage.setItem("selected_ad_provider", "linkvertise"); } catch(e) {}
+                log("Sử dụng SID:", sid);
 
                 log("Gửi start request tới Supabase...");
                 const startRes = await callSupabase({ action: "start", sid }, "https://keys.combowick.com/verify/step1");
                 log("Supabase start response:", JSON.stringify(startRes));
 
-                if (!startRes || !startRes.success) {
-                    logErr("Khởi tạo thất bại, bật auto-clicker");
+                // Nếu start trả về repeat (đã start rồi) thì vẫn tiếp tục, nếu lỗi khác mới chuyển watcher
+                if (startRes && !startRes.success && startRes.reason !== "repeat") {
+                    logErr("Khởi tạo thất bại, bật auto-clicker:", startRes);
                     showToast("ComboWick", "Chuyển sang chế độ tự động bấm checkpoint...");
                     startAutoClickWatcher();
                     return;
                 }
 
-                showToast("ComboWick Auto-Access", "Khởi tạo thành công! Bắt đầu giải 3 bước...", true);
+                showToast("ComboWick Auto-Access", "Khởi tạo thành công! Bắt đầu tiến trình...", true);
 
                 let allPassed = true;
                 for (let step = 1; step <= 3; step++) {
@@ -447,17 +489,21 @@
 
                     if (!hashVal) {
                         logErr(`Không lấy được hash cho Step ${step}. Chuyển sang watcher nút bấm...`);
-                        showToast("ComboWick", `Linkvertise cần mở tab hoặc chờ. Tự động hỗ trợ nút...`);
+                        showToast("ComboWick", `Linkvertise cần duyệt trang. Tự động bấm nút...`);
                         startAutoClickWatcher();
                         allPassed = false;
                         break;
                     }
 
-                    // Chờ giãn cách an toàn 8.5s theo quy chuẩn backend để tránh rate limit
-                    for (let s = 8; s > 0; s--) {
-                        showToast(`ComboWick Step ${step}/3`, `Xác nhận hoàn thành trong: ${s}s...`);
+                    // Chống phát hiện "nhanh quá bị tê" (Backend yêu cầu tối thiểu >= 8 giây, giãn cách 10s an toàn tuyệt đối)
+                    for (let s = 10; s > 0; s--) {
+                        showToast(`ComboWick Step ${step}/3`, `Giãn cách an toàn (tránh bị phát hiện): ${s}s...`);
                         await new Promise(r => setTimeout(r, 1000));
                     }
+
+                    try {
+                        localStorage.setItem("verification_step", `step${step}`);
+                    } catch(e) {}
 
                     log(`Gửi xác thực Step ${step} với hash:`, hashVal);
                     const stepRes = await callSupabase(
@@ -468,6 +514,20 @@
 
                     if (!stepRes || !stepRes.success) {
                         logErr(`Xác thực Step ${step} thất bại:`, stepRes);
+                        if (stepRes && stepRes.reason === "too_fast") {
+                            showToast("ComboWick", `Tốc độ quá nhanh, đang chờ thêm 5s...`);
+                            await new Promise(r => setTimeout(r, 5000));
+                            // Thử gửi lại 1 lần nữa sau khi đã chờ thêm
+                            const retryStep = await callSupabase(
+                                { action: "step", sid, step: `step${step}`, hash: hashVal },
+                                `https://keys.combowick.com/ad-return/step${step}?hash=${hashVal}`
+                            );
+                            if (retryStep && retryStep.success) {
+                                log(`Step ${step} gửi lại thành công!`);
+                                try { localStorage.setItem(`step${step}_completed`, "true"); } catch(e) {}
+                                continue;
+                            }
+                        }
                         showToast("ComboWick", `Xác thực Step ${step} không thành công. Chuyển sang hỗ trợ nút.`);
                         startAutoClickWatcher();
                         allPassed = false;
@@ -483,7 +543,7 @@
 
                 // Nhận verify_token cuối cùng
                 log("Đang gửi yêu cầu nhận verify_token cuối cùng...");
-                showToast("ComboWick", "Đang cấp token truy cập 8 tiếng...", true);
+                showToast("ComboWick", "Đang hoàn tất cấp Key 8 tiếng...", true);
                 await new Promise(r => setTimeout(r, 1500));
 
                 const tokenRes = await callSupabase({ sid }, "https://keys.combowick.com/ad-return/step3");
@@ -506,22 +566,22 @@
                     }, 800);
                 } else {
                     logErr("Lỗi cấp Token:", tokenRes);
-                    showToast("Lỗi cấp Token", JSON.stringify(tokenRes));
+                    showToast("Lỗi cấp Token", formatErr(tokenRes));
                     startAutoClickWatcher();
                 }
             } catch(fatalErr) {
                 logErr("Lỗi Fatal trong runComboWickEngine:", fatalErr);
-                showToast("ComboWick", "Gặp lỗi: " + (fatalErr.message || fatalErr));
+                showToast("ComboWick", "Gặp lỗi: " + formatErr(fatalErr));
                 startAutoClickWatcher();
             }
         }
 
         if (document.readyState === "loading") {
             window.addEventListener("DOMContentLoaded", () => {
-                setTimeout(runComboWickEngine, 200);
+                setTimeout(runComboWickEngine, 300);
             });
         } else {
-            setTimeout(runComboWickEngine, 200);
+            setTimeout(runComboWickEngine, 300);
         }
     }
 })();
