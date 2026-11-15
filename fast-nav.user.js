@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FastNav Suite Pro - Direct Navigation Helper
 // @namespace    http://tampermonkey.net/
-// @version      1.3.1
+// @version      1.4.0
 // @description  Tự động hỗ trợ điều hướng và giải quyết liên kết đích mượt mà (kiến trúc Modular Engine).
 // @author       khanghack222
 // @match        *://*.linkvertise.com/*
@@ -30,6 +30,12 @@
 // @match        https://links.lootlabs.gg/*
 // @match        https://*.lootlabs.gg/*
 // @match        https://nerventualken.com/*
+// @match        *://projectreal.gg/*
+// @match        *://*.projectreal.gg/*
+// @match        *://projectreal.net/*
+// @match        *://*.projectreal.net/*
+// @match        *://projectreal.lol/*
+// @match        *://*.projectreal.lol/*
 // @connect      *
 // @connect      sqahviibykrzlwnulgmw.supabase.co
 // @connect      publisher.linkvertise.com
@@ -38,6 +44,8 @@
 // @connect      onsultingco.com
 // @connect      nismscoldnesfspu.org
 // @connect      nerventualken.com
+// @connect      api.projectreal.gg
+// @connect      projectreal.gg
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setClipboard
 // @grant        unsafeWindow
@@ -48,6 +56,7 @@
 // @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/madium.core.js
 // @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/lootlabs.core.js
 // @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/turnstile.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/projectreal.core.js
 // @updateURL    https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/fast-nav.user.js
 // @downloadURL  https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/fast-nav.user.js
 // ==/UserScript==
