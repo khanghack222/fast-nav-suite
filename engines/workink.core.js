@@ -144,9 +144,15 @@
 
             switch (monetizationId) {
                 case 22: { // readArticles2
-                    monetizationSendMessage.call(monetization, {
-                        event: "read"
-                    });
+                    monetizationSendMessage.call(monetization, { event: "read" });
+                    monetizationSendMessage.call(monetization, { event: "completed" });
+                    break;
+                }
+                case 23: // readArticles
+                case 24: {
+                    monetizationSendMessage.call(monetization, { event: "start" });
+                    monetizationSendMessage.call(monetization, { event: "read" });
+                    monetizationSendMessage.call(monetization, { event: "completed" });
                     break;
                 }
 
@@ -211,7 +217,13 @@
                 }
 
                 default: {
-                    log("Unknown monetization type:", monetizationId, monetization);
+                    log("Unknown monetization type, firing generic complete:", monetizationId, monetization);
+                    try {
+                        monetizationSendMessage.call(monetization, { event: "start" });
+                        monetizationSendMessage.call(monetization, { event: "read" });
+                        monetizationSendMessage.call(monetization, { event: "completed" });
+                        monetizationSendMessage.call(monetization, { event: "installed" });
+                    } catch(e) {}
                     break;
                 }
             }
@@ -302,14 +314,8 @@
             const payload = args[0];
             log("Link destination received:", payload);
 
-            const waitTimeSeconds = 30;
-            const secondsPassed = (Date.now() - startTime) / 1000;
-
-            if (secondsPassed >= waitTimeSeconds) {
-                redirect(payload.url);
-            } else {
-                startCountdown(payload.url, waitTimeSeconds - secondsPassed);
-            }
+            log("Bypass thành công, chuyển hướng ngay lập tức:", payload.url);
+            redirect(payload.url);
 
             return _onLinkDestination.apply(this, args);
         };
@@ -643,5 +649,22 @@
             }
         }
     }, 400);
+
+
+    // Bỏ qua bộ đếm thời gian (Countdown timer 46s/50s) trên DOM nếu có
+    setInterval(() => {
+        // Tìm bất kỳ element nào có bộ đếm ngược hoặc class countdown
+        const timeElems = document.querySelectorAll('[class*="countdown"], [class*="timer"], [id*="timer"], [id*="countdown"]');
+        timeElems.forEach(el => {
+            el.textContent = "0s";
+        });
+
+        // Tự động tìm và click nút hoàn thành/bỏ qua ngay lập tức
+        const skipBtn = document.querySelector('button.skipBtn, button.skip, button[class*="skip"]');
+        if (skipBtn) {
+            log("Tự động click nút Skip ngay lập tức!");
+            skipBtn.click();
+        }
+    }, 200);
 
 })();
