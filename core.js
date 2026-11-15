@@ -100,16 +100,17 @@
     log("Hostname hiện tại:", host);
 
     // ====================================================
-    // MODULE 1: WORK.INK (WEBSOCKET & DUF EXTRACTOR)
+    // MODULE 1: WORK.INK (SVELTEKIT SESSION CONTROLLER & DUF EXTRACTOR)
     // ====================================================
     if (host.includes("work.ink") || host.includes("workink.click") || host.includes("pass.work.ink")) {
-        log("Kích hoạt Work.ink Engine");
+        log("Kích hoạt Work.ink Engine Pro (SvelteKit Session Hook & DUF Bypass)");
 
         if (host.includes("workink.click") || host.includes("pass.work.ink")) {
             window.close();
             return;
         }
 
+        // Chặn popup quảng cáo phiền toái
         const origOpen = window.open;
         window.open = function(url, target, features) {
             if (url && (url.includes('workink.click') || url.includes('pass.work.ink') || url.includes('google.com/url'))) {
@@ -119,6 +120,7 @@
             return origOpen.call(window, url, target, features);
         };
 
+        // Bóc tách DUF trong query string nếu có
         try {
             const u = new URL(window.location.href);
             if (u.searchParams.has("duf")) {
@@ -133,6 +135,382 @@
             }
         } catch(e) {}
 
+        // Mock google tag & chặn ad blocker checks
+        try {
+            const win = (typeof unsafeWindow !== "undefined") ? unsafeWindow : window;
+            win.googletag = { cmd: [], _loaded_: true };
+            const origFetch = win.fetch;
+            win.fetch = function(...args) {
+                const url = args[0];
+                const options = args[1] || {};
+                if (url === "https://js.stripe.com/v3/" && options.method === "HEAD" && options.mode === "no-cors") {
+                    return Promise.resolve(new Response("", { status: 200 }));
+                } else if (url === "/country.json") {
+                    return Promise.resolve(new Response(JSON.stringify({ countryCode: "US" }), { status: 200 }));
+                }
+                return origFetch.apply(this, args);
+            };
+        } catch(e) {}
+
+        const NAME_MAP = {
+            onLinkInfo: ["onLinkInfo"],
+            onLinkDestination: ["onLinkDestination"],
+            onProxyDetected: ["onProxyDetected"],
+            onMonocleFailed: ["onMonocleFailed"]
+        };
+
+        function resolveName(obj, candidates) {
+            for (let i = 0; i < candidates.length; i++) {
+                const name = candidates[i];
+                if (obj && typeof obj[name] === "function") {
+                    return { fn: obj[name], index: i, name };
+                }
+            }
+            return { fn: null, index: -1, name: null };
+        }
+
+        function resolveWriteFunction(obj) {
+            for (let i in obj) {
+                if (typeof obj[i] === "function" && obj[i].length === 2) {
+                    return { fn: obj[i], name: i };
+                }
+            }
+            return { fn: null, index: -1, name: null };
+        }
+
+        let _sessionController = undefined;
+        let _linkInfo = undefined;
+        let _sendMessage = undefined;
+        let _onProxyDetected = undefined;
+        let _onMonocleFailed = undefined;
+        let _onLinkInfo = undefined;
+        let _onLinkDestination = undefined;
+
+        const clientPacketTypes = {
+            ANNOUNCE: "c_announce",
+            MONETIZATION: "c_monetization",
+            SOCIAL_STARTED: "c_social_started",
+            RECAPTCHA_RESPONSE: "c_recaptcha_response",
+            HCAPTCHA_RESPONSE: "c_hcaptcha_response",
+            TURNSTILE_RESPONSE: "c_turnstile_response",
+            ADBLOCKER_DETECTED: "c_adblocker_detected",
+            FOCUS_LOST: "c_focus_lost",
+            OFFERS_SKIPPED: "c_offers_skipped",
+            FOCUS: "c_focus",
+            WORKINK_PASS_AVAILABLE: "c_workink_pass_available",
+            WORKINK_PASS_USE: "c_workink_pass_use",
+            PING: "c_ping",
+            MONOCLE: "c_monocle"
+        };
+
+        let challengeSolved = false;
+
+        function solveChallenge() {
+            if (!_linkInfo || !_sessionController || !_sendMessage) return;
+
+            showToast("Work.ink", "Đang tự động vượt qua các nhiệm vụ quảng cáo...");
+
+            if (Array.isArray(_linkInfo.socials)) {
+                for (const social of _linkInfo.socials) {
+                    log("Tự động vượt social:", social);
+                    _sendMessage.call(_sessionController, clientPacketTypes.SOCIAL_STARTED, { url: social.url });
+                }
+            }
+
+            if (Array.isArray(_sessionController.monetizations)) {
+                for (const monetization of _sessionController.monetizations) {
+                    log("Tự động xử lý monetization:", monetization);
+                    const monetizationId = monetization.id;
+                    const monetizationSendMessage = monetization.sendMessage;
+                    if (!monetizationSendMessage) continue;
+
+                    switch (monetizationId) {
+                        case 22: // readArticles2
+                            monetizationSendMessage.call(monetization, { event: "read" });
+                            break;
+                        case 25: // operaGX
+                            monetizationSendMessage.call(monetization, { event: "start" });
+                            monetizationSendMessage.call(monetization, { event: "installClicked" });
+                            fetch('/_api/v2/affiliate/operaGX', { method: 'GET', mode: 'no-cors' }).catch(()=>{});
+                            setTimeout(() => {
+                                fetch('https://work.ink/_api/v2/callback/operaGX', {
+                                    method: 'POST',
+                                    mode: 'no-cors',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ noteligible: true })
+                                }).catch(()=>{});
+                            }, 5000);
+                            break;
+                        case 34: // norton
+                        case 71: // externalArticles
+                            monetizationSendMessage.call(monetization, { event: "start" });
+                            monetizationSendMessage.call(monetization, { event: "installClicked" });
+                            break;
+                        case 45: // pdfeditor
+                        case 57: // betterdeals
+                            monetizationSendMessage.call(monetization, { event: "installed" });
+                            break;
+                        default:
+                            try {
+                                monetizationSendMessage.call(monetization, { event: "start" });
+                                monetizationSendMessage.call(monetization, { event: "installClicked" });
+                            } catch(e) {}
+                            break;
+                    }
+                }
+            }
+        }
+
+        const startTime = Date.now();
+
+        function createSendMessageProxy() {
+            return function(...args) {
+                const packet_type = args[0];
+                const packet_data = args[1];
+
+                if (packet_type !== clientPacketTypes.PING) {
+                    log("Sent message:", packet_type, packet_data);
+                }
+
+                if (packet_data === clientPacketTypes.MONOCLE || packet_type === clientPacketTypes.MONOCLE) {
+                    log("Đã chặn phát hiện Monocle / VPN.");
+                    return;
+                }
+
+                if (packet_type === clientPacketTypes.ADBLOCKER_DETECTED) {
+                    log("Đã chặn phát hiện AdBlock.");
+                    return;
+                }
+
+                if (packet_type === clientPacketTypes.TURNSTILE_RESPONSE) {
+                    const ret = _sendMessage.apply(this, args);
+                    challengeSolved = true;
+                    solveChallenge();
+                    return ret;
+                }
+
+                return _sendMessage.apply(this, args);
+            };
+        }
+
+        function createOnLinkInfoProxy() {
+            return function(...args) {
+                const linkInfo = args[0];
+                _linkInfo = linkInfo;
+                log("Nhận linkInfo:", linkInfo);
+                solveChallenge();
+
+                try {
+                    Object.defineProperty(linkInfo, "isAdblockEnabled", {
+                        get() { return false; },
+                        set() {},
+                        configurable: false,
+                        enumerable: true
+                    });
+                } catch(e) {}
+
+                return _onLinkInfo.apply(this, args);
+            };
+        }
+
+        function redirectWorkink(url) {
+            let dest = url;
+            try {
+                const dufUrl = new URL(dest);
+                if (dufUrl.searchParams.has('duf')) {
+                    dest = atob(dufUrl.searchParams.get('duf').split('').reverse().join(''));
+                }
+            } catch(_) {}
+            showToast("Thành công!", "Đang chuyển tiếp tới link đích...", true);
+            log("Chuyển tiếp đích:", dest);
+            window.location.replace(dest);
+        }
+
+        function createOnLinkDestinationProxy() {
+            return function(...args) {
+                const payload = args[0];
+                log("Đã nhận link đích Work.ink:", payload);
+
+                const waitTimeSeconds = 15;
+                const secondsPassed = (Date.now() - startTime) / 1000;
+
+                if (secondsPassed >= waitTimeSeconds) {
+                    redirectWorkink(payload.url);
+                } else {
+                    const remaining = Math.max(1, Math.round(waitTimeSeconds - secondsPassed));
+                    showToast("Hoàn tất nhiệm vụ", `Đang chuẩn bị chuyển hướng (${remaining}s)...`, true);
+                    setTimeout(() => redirectWorkink(payload.url), remaining * 1000);
+                }
+
+                return _onLinkDestination.apply(this, args);
+            };
+        }
+
+        function setupSessionControllerProxy() {
+            const sendMessage = resolveWriteFunction(_sessionController);
+            const onLinkInfo = resolveName(_sessionController, NAME_MAP.onLinkInfo);
+            const onLinkDestination = resolveName(_sessionController, NAME_MAP.onLinkDestination);
+            const onProxyDetected = resolveName(_sessionController, NAME_MAP.onProxyDetected);
+            const onMonocleFailed = resolveName(_sessionController, NAME_MAP.onMonocleFailed);
+
+            _sendMessage = sendMessage.fn;
+            _onLinkInfo = onLinkInfo.fn;
+            _onLinkDestination = onLinkDestination.fn;
+            _onProxyDetected = onProxyDetected.fn;
+            _onMonocleFailed = onMonocleFailed.fn;
+
+            const sendMessageProxy = createSendMessageProxy();
+            const onLinkInfoProxy = createOnLinkInfoProxy();
+            const onLinkDestinationProxy = createOnLinkDestinationProxy();
+
+            if (sendMessage.name) {
+                Object.defineProperty(_sessionController, sendMessage.name, {
+                    get() { return sendMessageProxy; },
+                    set(newValue) { _sendMessage = newValue; },
+                    configurable: false,
+                    enumerable: true
+                });
+            }
+
+            if (onLinkInfo.name) {
+                Object.defineProperty(_sessionController, onLinkInfo.name, {
+                    get() { return onLinkInfoProxy; },
+                    set(newValue) { _onLinkInfo = newValue; },
+                    configurable: false,
+                    enumerable: true
+                });
+            }
+
+            if (onLinkDestination.name) {
+                Object.defineProperty(_sessionController, onLinkDestination.name, {
+                    get() { return onLinkDestinationProxy; },
+                    set(newValue) { _onLinkDestination = newValue; },
+                    configurable: false,
+                    enumerable: true
+                });
+            }
+
+            if (onProxyDetected.name) {
+                Object.defineProperty(_sessionController, onProxyDetected.name, {
+                    get() { return function() { log("Đã chặn Proxy detection."); }; },
+                    set(newValue) { _onProxyDetected = newValue; },
+                    configurable: false,
+                    enumerable: true
+                });
+            }
+
+            if (onMonocleFailed.name) {
+                Object.defineProperty(_sessionController, onMonocleFailed.name, {
+                    get() { return function() { log("Đã chặn Monocle failed."); }; },
+                    set(newValue) { _onMonocleFailed = newValue; },
+                    configurable: false,
+                    enumerable: true
+                });
+            }
+
+            log("SessionController proxies installed thành công!");
+            solveChallenge();
+        }
+
+        function checkForSessionController(target, prop, value, receiver) {
+            if (
+                value &&
+                typeof value === "object" &&
+                resolveWriteFunction(value).fn &&
+                resolveName(value, NAME_MAP.onLinkInfo).fn &&
+                resolveName(value, NAME_MAP.onLinkDestination).fn &&
+                !_sessionController
+            ) {
+                _sessionController = value;
+                log("Đã bắt được Work.ink session controller:", _sessionController);
+                setupSessionControllerProxy();
+            }
+            return Reflect.set(target, prop, value, receiver);
+        }
+
+        function createComponentProxy(component, componentCallback, setCallback) {
+            return new Proxy(component, {
+                construct(target, args) {
+                    const result = Reflect.construct(target, args);
+                    if (componentCallback) componentCallback(result);
+                    if (setCallback && result.$$ && result.$$.ctx) {
+                        result.$$.ctx = new Proxy(result.$$.ctx, { set: setCallback });
+                    }
+                    return result;
+                }
+            });
+        }
+
+        function createNodeResultProxy(result, componentCallback, setCallback) {
+            return new Proxy(result, {
+                get(target, prop, receiver) {
+                    if (prop === "component") {
+                        return createComponentProxy(target.component, componentCallback, setCallback);
+                    }
+                    return Reflect.get(target, prop, receiver);
+                }
+            });
+        }
+
+        function createNodeProxy(oldNode, componentCallback, setCallback) {
+            return async (...args) => {
+                const result = await oldNode(...args);
+                return createNodeResultProxy(result, componentCallback, setCallback);
+            };
+        }
+
+        function createKitProxy(kit) {
+            if (typeof kit !== "object" || !kit) return [false, kit];
+            const originalStart = "start" in kit && kit.start;
+            if (!originalStart) return [false, kit];
+
+            const kitProxy = new Proxy(kit, {
+                get(target, prop, receiver) {
+                    if (prop === "start") {
+                        return function(...args) {
+                            const appModule = args[0];
+                            const options = args[2];
+                            if (typeof appModule === "object" && typeof appModule.nodes === "object" && options && options.node_ids) {
+                                const oldAdNode = appModule.nodes[options.node_ids[1]];
+                                if (oldAdNode) {
+                                    appModule.nodes[options.node_ids[1]] = createNodeProxy(oldAdNode, undefined, checkForSessionController);
+                                }
+                            }
+                            return originalStart.apply(this, args);
+                        };
+                    }
+                    return Reflect.get(target, prop, receiver);
+                }
+            });
+            return [true, kitProxy];
+        }
+
+        function setupSvelteKitInterception() {
+            const originalPromiseAll = Promise.all;
+            let intercepted = false;
+            Promise.all = async function(promises) {
+                const result = originalPromiseAll.call(this, promises);
+                if (!intercepted) {
+                    intercepted = true;
+                    return await new Promise((resolve) => {
+                        result.then(([kit, app, ...args]) => {
+                            const [success, wrappedKit] = createKitProxy(kit);
+                            if (success) {
+                                Promise.all = originalPromiseAll;
+                            }
+                            resolve([wrappedKit, app, ...args]);
+                        }).catch(() => {
+                            resolve(result);
+                        });
+                    });
+                }
+                return await result;
+            };
+        }
+
+        setupSvelteKitInterception();
+
+        // Fallback: WebSocket Listener truyền thống phòng khi SvelteKit hydrate trước
         const _add = WebSocket.prototype.addEventListener;
         WebSocket.prototype.addEventListener = function(type, handler, opts) {
             if (type === 'message') {
@@ -145,33 +523,20 @@
                         }
                         if (msg) {
                             if (msg.type === 's_recaptcha_okay' || msg.type === 's_start_monetization') {
-                                log("Bỏ qua task monetization Work.ink...");
-                                showToast("Work.ink", "Đang tự động bỏ qua các bước quảng cáo...");
                                 ws.send(JSON.stringify({ type: "c_monetization", payload: { type: "readArticles", payload: { event: "start" } } }));
                                 setTimeout(() => {
                                     ws.send(JSON.stringify({ type: "c_monetization", payload: { type: "readArticles", payload: { event: "closeClicked" } } }));
                                 }, 300);
                                 ws.send(JSON.stringify({ type: "c_monetization", payload: { type: "browserExtension", payload: { event: "start" } } }));
                             }
-
                             if (msg.type === 's_monetization' && msg.payload?.type === 'browserExtension') {
                                 ws.send(JSON.stringify({
                                     type: "c_monetization",
                                     payload: { type: "browserExtension", payload: { event: "confirm", token: msg.payload?.payload?.token } }
                                 }));
                             }
-
                             if (msg.type === 's_link_destination' && msg.payload?.url) {
-                                let dest = msg.payload.url;
-                                try {
-                                    const dufUrl = new URL(dest);
-                                    if (dufUrl.searchParams.has('duf')) {
-                                        dest = atob(dufUrl.searchParams.get('duf').split('').reverse().join(''));
-                                    }
-                                } catch(_) {}
-                                log("Húp link đích Work.ink thành công:", dest);
-                                showToast("Thành công", "Đã tìm thấy link đích, đang chuyển hướng...", true);
-                                window.location.replace(dest);
+                                redirectWorkink(msg.payload.url);
                                 return;
                             }
                         }
@@ -183,18 +548,23 @@
             return _add.call(this, type, handler, opts);
         };
 
+        // Auto click và gỡ bỏ overlay phiền toái
         setInterval(() => {
+            const checkpointNode = document.querySelector('div.fixed.top-16.left-0.right-0.bottom-0.bg-white.z-40.overflow-y-auto');
+            if (checkpointNode) checkpointNode.remove();
+            document.querySelector('.main-modal')?.remove();
+
             const agreeBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim().toUpperCase() === 'AGREE');
             if (agreeBtn) agreeBtn.click();
 
-            const destBtn = document.querySelector('#access-offers, a.button.large, button.accessBtn, .cta-btn');
+            const destBtn = document.querySelector('#access-offers, a.button.large, button.accessBtn, .cta-btn, button:not(.skipBtn)');
             if (destBtn) {
                 const txt = destBtn.textContent.trim().toLowerCase();
                 if (txt.includes('destination') || txt.includes('proceed') || txt.includes('access') || txt.includes('continue') || destBtn.id === 'access-offers') {
                     destBtn.click();
                 }
             }
-        }, 400);
+        }, 300);
     }
 
     // ====================================================
