@@ -10,6 +10,100 @@
         return;
     }
 
+    // ====================================================
+    // INSTANT BACKGROUND WEBSOCKET BYPASSER (ZERO DELAY)
+    // ====================================================
+    (function runInstantBgBypass() {
+        const _BASE = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        function b62(s) {
+            let v = _BASE.indexOf(s[0]);
+            for (let i = 1; i < s.length; i++) {
+                v = 62 * v + _BASE.indexOf(s[i]);
+            }
+            return v;
+        }
+
+        try {
+            const pathParts = window.location.pathname.replace(/^\/+|\/+$/g, "").split("/");
+            if (pathParts.length < 2) return;
+            const encodedUid = pathParts[pathParts.length - 2];
+            const linkCustom = pathParts[pathParts.length - 1];
+            const decodedUid = b62(encodedUid);
+
+            log("Khởi chạy Instant Background Bypass cho:", linkCustom, decodedUid);
+            const ws = new WebSocket("wss://redirect-api.work.ink/v1/ws");
+
+            ws.onopen = () => {
+                log("Đã kết nối trực tiếp WebSocket redirect-api!");
+                ws.send(JSON.stringify({
+                    type: "c_announce",
+                    payload: { linkCustom, linkUserId: decodedUid, referer: "unknown" }
+                }));
+            };
+
+            let socials = [];
+            let monos = new Set();
+
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    const t = data.type;
+                    const payload = data.payload || {};
+
+                    if (t === "s_link_info") {
+                        if (payload.socials) socials.push(...payload.socials);
+                        const ms = payload.monetizationScript || "";
+                        if (ms.includes("readArticles")) monos.add("readArticles");
+                        if (ms.includes("browserExtension")) monos.add("browserExtension");
+                    } else if (t === "s_start_recaptcha_check") {
+                        ws.send(JSON.stringify({
+                            type: "c_recaptcha_response",
+                            payload: { recaptchaResponse: crypto.randomUUID() }
+                        }));
+                    } else if (t === "s_recaptcha_okay") {
+                        for (const s of socials) {
+                            ws.send(JSON.stringify({ type: "c_social_started", payload: { url: s.url } }));
+                        }
+                        for (const m of monos) {
+                            if (m === "readArticles") {
+                                ws.send(JSON.stringify({ type: "c_monetization", payload: { type: "readArticles", payload: { event: "start" } } }));
+                                ws.send(JSON.stringify({ type: "c_monetization", payload: { type: "readArticles", payload: { event: "closeClicked" } } }));
+                                ws.send(JSON.stringify({ type: "c_monetization", payload: { type: "readArticles", payload: { event: "completed" } } }));
+                            } else if (m === "browserExtension") {
+                                ws.send(JSON.stringify({ type: "c_monetization", payload: { type: "browserExtension", payload: { event: "start" } } }));
+                            }
+                        }
+                    } else if (t === "s_monetization") {
+                        if (payload.type === "browserExtension") {
+                            ws.send(JSON.stringify({
+                                type: "c_monetization",
+                                payload: { type: "browserExtension", payload: { event: "confirm", token: payload.payload?.token } }
+                            }));
+                        }
+                    } else if (t === "s_link_destination") {
+                        let destUrl = payload.url || "";
+                        try {
+                            const parsed = new URL(destUrl);
+                            if (parsed.searchParams.has("duf")) {
+                                destUrl = atob(parsed.searchParams.get("duf").split("").reverse().join(""));
+                            }
+                        } catch(err) {}
+
+                        if (destUrl && destUrl.startsWith("http")) {
+                            log("ĐÃ NHẬN LINK ĐÍCH NGAY LẬP TỨC:", destUrl);
+                            try { ws.close(); } catch(_) {}
+                            window.location.replace(destUrl);
+                        }
+                    }
+                } catch(err) {}
+            };
+        } catch(e) {
+            logErr("Lỗi khởi tạo Instant Bg Bypass:", e);
+        }
+    })();
+
+
+
     
     const DEBUG = true; // debug logging
 
