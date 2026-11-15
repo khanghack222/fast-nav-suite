@@ -51,3 +51,8 @@
 // @updateURL    https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/fast-nav.user.js
 // @downloadURL  https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/fast-nav.user.js
 // ==/UserScript==
+
+(function() {
+    'use strict';
+    console.log('%c[FastNav Suite]%c Loader initialized with 6 engines.', 'color:#10b981;font-weight:bold;', 'color:#38bdf8;');
+})();
