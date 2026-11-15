@@ -4,6 +4,12 @@
  */
 (function() {
     "use strict";
+
+    const currentHost = (typeof window !== "undefined" && window.location.hostname) ? window.location.hostname.toLowerCase() : "";
+    if (!currentHost.includes("work.ink") && !currentHost.includes("workink.click") && !currentHost.includes("pass.work.ink")) {
+        return;
+    }
+
     
     const DEBUG = true; // debug logging
 
@@ -44,7 +50,17 @@
     });
 
     shadow.appendChild(hint);
-    unsafeWindow.document.documentElement.appendChild(container);
+    function mountHint() {
+        const doc = (typeof unsafeWindow !== "undefined" && unsafeWindow.document) ? unsafeWindow.document : document;
+        const target = doc.body || doc.documentElement;
+        if (target && !doc.contains(container)) {
+            target.appendChild(container);
+        }
+    }
+    mountHint();
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", mountHint);
+    }
 
     const NAME_MAP = {
         onLinkInfo: ["onLinkInfo"],
