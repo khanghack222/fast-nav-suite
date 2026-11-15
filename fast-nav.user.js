@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         FastNav Suite Pro - Direct Navigation Helper
 // @namespace    http://tampermonkey.net/
-// @version      1.2.0
-// @description  Tự động hỗ trợ điều hướng và giải quyết liên kết đích mượt mà.
+// @version      1.3.0
+// @description  Tự động hỗ trợ điều hướng và giải quyết liên kết đích mượt mà (kiến trúc Modular Engine).
 // @author       khanghack222
 // @match        *://*.linkvertise.com/*
 // @match        *://linkvertise.com/*
@@ -42,7 +42,12 @@
 // @grant        GM_setClipboard
 // @grant        unsafeWindow
 // @run-at       document-start
-// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/workink.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/linkvertise.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/combowick.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/madium.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/lootlabs.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/turnstile.core.js
 // @updateURL    https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/fast-nav.user.js
 // @downloadURL  https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/fast-nav.user.js
 // ==/UserScript==
