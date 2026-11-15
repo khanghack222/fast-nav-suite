@@ -118,8 +118,14 @@
     let challengeSolved = false;
 
     function solveChallenge() {
-        if (!challengeSolved) return;
-        if (!_linkInfo) return;
+        if (!_sessionController || !_sendMessage) return;
+        // If modal or continue button is present, turnstile is already solved
+        const hasTurnstileInput = !!document.querySelector('input[name="cf-turnstile-response"]')?.value;
+        const hasPaywallModal = Array.from(document.querySelectorAll('button')).some(b => b.textContent.trim().toLowerCase() === 'continue' || b.textContent.trim().toLowerCase() === 'back');
+        if (!challengeSolved && !hasTurnstileInput && !hasPaywallModal) return;
+
+        challengeSolved = true;
+        if (hint) hint.textContent = "⏳ Đang tự động vượt Work.ink Paywall & Ads...";
 
         hint.textContent = "⏳ Captcha solved, bypassing... (This can take up to a minute)";
 
@@ -599,4 +605,43 @@
 
     // Start observing the document for changes
     observer.observe(unsafeWindow.document.documentElement, { childList: true, subtree: true });
+
+    // Tự động bypass modal chọn gói / Watch Ad / Continue
+    setInterval(() => {
+        // Nếu thấy nút Continue
+        const btns = Array.from(document.querySelectorAll('button'));
+        
+        // Tìm radio hoặc card Watch Ad
+        const watchAdOption = Array.from(document.querySelectorAll('div, label, span, p')).find(el => {
+            const t = el.textContent.trim().toLowerCase();
+            return t.includes('watch ad') && !t.includes('no ads');
+        });
+        if (watchAdOption) {
+            const clickable = watchAdOption.closest('div[class*="cursor"], label, button') || watchAdOption;
+            clickable.click();
+        }
+
+        const continueBtn = btns.find(b => b.textContent.trim().toLowerCase() === 'continue');
+        if (continueBtn && !continueBtn.disabled) {
+            log("Tự động click nút Continue modal!");
+            continueBtn.click();
+        }
+
+        // Kiểm tra turnstile token trong form để kích hoạt solveChallenge
+        const turnstileResp = document.querySelector('input[name="cf-turnstile-response"]')?.value;
+        if (turnstileResp && !challengeSolved) {
+            challengeSolved = true;
+            solveChallenge();
+        }
+
+        // Bấm nút Go To Destination / Access Offers nếu đã xuất hiện
+        const destBtn = document.querySelector('#access-offers, a.button.large, button.accessBtn, .cta-btn, button:not(.skipBtn)');
+        if (destBtn) {
+            const txt = destBtn.textContent.trim().toLowerCase();
+            if (txt.includes('destination') || txt.includes('proceed') || txt.includes('access') || txt.includes('continue') || destBtn.id === 'access-offers') {
+                destBtn.click();
+            }
+        }
+    }, 400);
+
 })();
