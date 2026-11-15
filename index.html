@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastNav Suite Pro - One-Click Installer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #090d16;
+            --surface: rgba(15, 23, 42, 0.75);
+            --border: rgba(255, 255, 255, 0.08);
+            --primary: #10b981;
+            --primary-glow: rgba(16, 185, 129, 0.25);
+            --accent: #38bdf8;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.12) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.1) 0px, transparent 50%);
+            color: var(--text-main);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 680px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 36px 32px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .title {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 14.5px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #042f2e;
+            box-shadow: 0 8px 20px var(--primary-glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+            box-shadow: 0 12px 26px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: #f8fafc;
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .code-container {
+            position: relative;
+            background: #040711;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 12px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        pre {
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12.5px;
+            line-height: 1.6;
+            color: #e2e8f0;
+            max-height: 280px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 12px;
+        }
+
+        .card-title {
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 2px;
+        }
+
+        .card-desc {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #10b981;
+            color: #042f2e;
+            font-weight: 700;
+            font-size: 13px;
+            padding: 10px 20px;
+            border-radius: 9999px;
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        @media (max-width: 600px) {
+            .actions { flex-direction: column; }
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <div class="badge">● v1.3.0 Modular Architecture</div>
+            <h1 class="title">FastNav Suite Pro</h1>
+            <p class="subtitle">Engine tự động hỗ trợ điều hướng, bóc tách link đích & giải mã Turnstile / LootLabs / ComboWick / Work.ink nhanh gọn.</p>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" id="copyBtn" onclick="copyScript()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                Copy Userscript Ngay
+            </button>
+            <a class="btn btn-secondary" href="https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/fast-nav.user.js" target="_blank">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                Cài Đặt Trực Tiếp (.user.js)
+            </a>
+        </div>
+
+        <div class="code-container">
+            <div class="code-header">
+                <span>fast-nav.user.js</span>
+                <span>Tampermonkey Ready</span>
+            </div>
+            <pre><code id="scriptCode">// ==UserScript==
+// @name         FastNav Suite Pro - Direct Navigation Helper
+// @namespace    http://tampermonkey.net/
+// @version      1.3.0
+// @description  Tự động hỗ trợ điều hướng và giải quyết liên kết đích mượt mà (kiến trúc Modular Engine).
+// @author       khanghack222
+// @match        *://*.linkvertise.com/*
+// @match        *://linkvertise.com/*
+// @match        *://*.link-to.net/*
+// @match        *://link-to.net/*
+// @match        *://*.link-target.net/*
+// @match        *://link-target.net/*
+// @match        *://*.link-center.net/*
+// @match        *://link-center.net/*
+// @match        *://*.link-hub.net/*
+// @match        *://link-hub.net/*
+// @match        *://*.direct-link.net/*
+// @match        *://direct-link.net/*
+// @match        *://*.file-link.net/*
+// @match        *://file-link.net/*
+// @match        *://*.work.ink/*
+// @match        *://work.ink/*
+// @match        *://*.workink.click/*
+// @match        *://workink.click/*
+// @match        *://*.pass.work.ink/*
+// @match        *://pass.work.ink/*
+// @match        *://keys.combowick.com/*
+// @match        *://combowick.com/*
+// @match        *://app.getmadium.xyz/*
+// @match        https://links.lootlabs.gg/*
+// @match        https://*.lootlabs.gg/*
+// @match        https://nerventualken.com/*
+// @connect      *
+// @connect      sqahviibykrzlwnulgmw.supabase.co
+// @connect      publisher.linkvertise.com
+// @connect      auth.getmadium.xyz
+// @connect      enaightdecipie.com
+// @connect      onsultingco.com
+// @connect      nismscoldnesfspu.org
+// @connect      nerventualken.com
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setClipboard
+// @grant        unsafeWindow
+// @run-at       document-start
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/workink.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/linkvertise.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/combowick.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/madium.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/lootlabs.core.js
+// @require      https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/engines/turnstile.core.js
+// @updateURL    https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/fast-nav.user.js
+// @downloadURL  https://raw.githubusercontent.com/khanghack222/fast-nav-suite/main/fast-nav.user.js
+// ==/UserScript==</code></pre>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-title">Work.ink</div>
+                <div class="card-desc">SvelteKit hook & DUF extractor</div>
+            </div>
+            <div class="card">
+                <div class="card-title">ComboWick</div>
+                <div class="card-desc">Auto-Step 1-3 & Supabase bypass</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Madium & LootLabs</div>
+                <div class="card-desc">Turnstile solve & instant XOR key</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">✓ Đã sao chép Userscript vào bộ nhớ tạm!</div>
+
+    <script>
+        function copyScript() {
+            const code = document.getElementById("scriptCode").innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                const toast = document.getElementById("toast");
+                toast.classList.add("show");
+                const btn = document.getElementById("copyBtn");
+                const originalText = btn.innerHTML;
+                btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Đã Sao Chép!`;
+                setTimeout(() => {
+                    toast.classList.remove("show");
+                    btn.innerHTML = originalText;
+                }, 2000);
+            }).catch(err => {
+                alert("Không thể sao chép tự động: " + err);
+            });
+        }
+    </script>
+</body>
+</html>
