@@ -1,6 +1,6 @@
 /**
- * FastNav Suite - Linkvertise Engine
- * Independent Core Module
+ * FastNav Suite - Linkvertise Engine Pro
+ * Independent Core Module with Hybrid GraphQL + DOM Auto-Completer
  */
 (function() {
     'use strict';
@@ -110,7 +110,7 @@ if (!window.FastNav.utils) {
     const { log, logErr, showToast, nativeFetch, sendReq, host } = window.FastNav.utils;
 
     // ====================================================
-    // MODULE 2: LINKVERTISE ENGINE (GRAPHQL CHUẨN XÁC)
+    // MODULE 2: LINKVERTISE ENGINE (GRAPHQL + DOM HYBRID)
     // ====================================================
     const isLinkvertise = ["linkvertise.com", "link-to.net", "link-target.net", "link-center.net", "link-hub.net", "direct-link.net", "file-link.net"].some(d => host.includes(d));
 
@@ -222,6 +222,49 @@ if (!window.FastNav.utils) {
 
     if (isLinkvertise) {
         log("Phát hiện trang Linkvertise");
+
+        // DOM Auto-Completer dự phòng song song
+        function startLinkvertiseDOMHelper() {
+            log("Kích hoạt Linkvertise DOM Helper...");
+            const domTimer = setInterval(() => {
+                // 1. Tự động click nút Free Access with Ads
+                const buttons = Array.from(document.querySelectorAll('button, a'));
+                const freeAccessBtn = buttons.find(b => {
+                    const txt = (b.textContent || "").toLowerCase();
+                    return (
+                        txt.includes("free access with ads") ||
+                        txt.includes("free access") ||
+                        txt.includes("access with ads") ||
+                        txt.includes("kostenloser zugang") ||
+                        txt.includes("accès gratuit") ||
+                        txt.includes("acceso gratis")
+                    ) && !b.disabled;
+                });
+                if (freeAccessBtn) {
+                    log("Phát hiện nút Free Access, click:", freeAccessBtn.textContent.trim());
+                    freeAccessBtn.click();
+                }
+
+                // 2. Tự động đóng popup quảng cáo khi có nút X
+                const closeBtns = document.querySelectorAll('button.close, [aria-label="Close"], svg.cross, .dialog-close, [class*="close"]');
+                closeBtns.forEach(cb => {
+                    if (cb && !cb.disabled && cb.offsetParent !== null) {
+                        try { cb.click(); } catch(e) {}
+                    }
+                });
+
+                // 3. Tự động click I'm interested nếu xuất hiện prompt
+                const interestedBtn = buttons.find(b => {
+                    const txt = (b.textContent || "").toLowerCase();
+                    return txt.includes("i'm interested") || txt.includes("tôi quan tâm") || txt.includes("interested");
+                });
+                if (interestedBtn && !interestedBtn.disabled) {
+                    try { interestedBtn.click(); } catch(e) {}
+                }
+            }, 500);
+        }
+        startLinkvertiseDOMHelper();
+
         const pathParts = window.location.pathname.split("/").filter(Boolean);
         const searchParams = new URLSearchParams(window.location.search);
         const rParam = searchParams.get("r");

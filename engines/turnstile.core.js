@@ -56,7 +56,10 @@ if (!window.FastNav.utils) {
             try { body = await res.text(); } catch(err) { body = null; }
         }
         if (!res.ok) {
-            let msg = (body && typeof body === "object" && body.message) ? body.message : (typeof body === "string" ? body : `HTTP ${res.status}`);
+            if (body && typeof body === "object") {
+                return body;
+            }
+            let msg = (typeof body === "string" && body.length < 150) ? body : `HTTP ${res.status}`;
             throw new Error(msg);
         }
         return body;

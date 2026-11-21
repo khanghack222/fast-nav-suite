@@ -683,6 +683,45 @@
 
     if (isLinkvertise) {
         log("Phát hiện trang Linkvertise");
+
+        // DOM Auto-Completer dự phòng song song
+        function startLinkvertiseDOMHelper() {
+            log("Kích hoạt Linkvertise DOM Helper...");
+            const domTimer = setInterval(() => {
+                const buttons = Array.from(document.querySelectorAll('button, a'));
+                const freeAccessBtn = buttons.find(b => {
+                    const txt = (b.textContent || "").toLowerCase();
+                    return (
+                        txt.includes("free access with ads") ||
+                        txt.includes("free access") ||
+                        txt.includes("access with ads") ||
+                        txt.includes("kostenloser zugang") ||
+                        txt.includes("accès gratuit") ||
+                        txt.includes("acceso gratis")
+                    ) && !b.disabled;
+                });
+                if (freeAccessBtn) {
+                    log("Phát hiện nút Free Access, click:", freeAccessBtn.textContent.trim());
+                    freeAccessBtn.click();
+                }
+
+                const closeBtns = document.querySelectorAll('button.close, [aria-label="Close"], svg.cross, .dialog-close, [class*="close"]');
+                closeBtns.forEach(cb => {
+                    if (cb && !cb.disabled && cb.offsetParent !== null) {
+                        try { cb.click(); } catch(e) {}
+                    }
+                });
+
+                const interestedBtn = buttons.find(b => {
+                    const txt = (b.textContent || "").toLowerCase();
+                    return txt.includes("i'm interested") || txt.includes("tôi quan tâm") || txt.includes("interested");
+                });
+                if (interestedBtn && !interestedBtn.disabled) {
+                    try { interestedBtn.click(); } catch(e) {}
+                }
+            }, 500);
+        }
+        startLinkvertiseDOMHelper();
         const pathParts = window.location.pathname.split("/").filter(Boolean);
         const searchParams = new URLSearchParams(window.location.search);
         const rParam = searchParams.get("r");
@@ -754,10 +793,10 @@
     }
 
     // ====================================================
-    // MODULE 3: COMBOWICK COMPLETE AUTO-SOLVER (HARDENED)
+    // MODULE 3: COMBOWICK COMPLETE AUTO-SOLVER (PRO HARDENED)
     // ====================================================
     if (host.includes("combowick.com")) {
-        log("Kích hoạt ComboWick Engine trên combowick.com");
+        log("Kích hoạt ComboWick Pro Engine trên combowick.com");
 
         // 1. Tự động ngụy trang document.referrer thuộc hệ thống Linkvertise
         try {
@@ -767,10 +806,53 @@
             });
         } catch(e) {}
 
-        // 2. Nếu đang ở trang /access-key -> Đã hoàn thành
+        // Tắt tiếng video YouTube tự động để tránh ồn và tiết kiệm tài nguyên
+        function muteYouTubePlayer() {
+            document.querySelectorAll('iframe[src*="youtube"]').forEach(iframe => {
+                try {
+                    iframe.contentWindow.postMessage('{"event":"command","func":"mute","args":""}', '*');
+                } catch(e) {}
+            });
+        }
+        setTimeout(muteYouTubePlayer, 500);
+        setTimeout(muteYouTubePlayer, 1500);
+
+        // 2. Trang /access-key -> Tự động tìm và sao chép Key vào Clipboard
         if (window.location.pathname.includes("/access-key")) {
-            log("Đang ở trang /access-key, hoàn tất cấp Key.");
-            showToast("ComboWick Key", "Đã mở khóa Key thành công!", true);
+            log("Đang ở trang /access-key, khởi động Key Auto-Extractor...");
+            showToast("ComboWick Key", "Đang tự động phát hiện và trích xuất Key...", true);
+
+            let copied = false;
+            const keyCheckInterval = setInterval(() => {
+                if (copied) {
+                    clearInterval(keyCheckInterval);
+                    return;
+                }
+
+                const codeElements = Array.from(document.querySelectorAll('code, pre, input[readonly], .font-mono, [class*="font-mono"]'));
+                for (const el of codeElements) {
+                    const text = (el.value || el.textContent || "").trim();
+                    if (text && text.length >= 10 && !text.includes(" ") && !text.toLowerCase().includes("select")) {
+                        copied = true;
+                        clearInterval(keyCheckInterval);
+                        log("Đã phát hiện Key:", text);
+                        if (typeof GM_setClipboard === "function") {
+                            GM_setClipboard(text);
+                        }
+                        showToast("ComboWick Key Thành Công", `Đã copy Key vào bộ nhớ tạm: ${text.slice(0, 8)}...`, true);
+                        return;
+                    }
+                }
+
+                const getBtn = Array.from(document.querySelectorAll('button')).find(b => {
+                    const t = (b.textContent || "").toLowerCase();
+                    return (t.includes("get my") || t.includes("nhận key")) && !b.disabled;
+                });
+                if (getBtn) {
+                    log("Phát hiện nút nhận Key khả dụng, tự động nhấn:", getBtn.textContent.trim());
+                    getBtn.click();
+                }
+            }, 500);
             return;
         }
 
@@ -786,14 +868,25 @@
                 const redir = params.get("redirect") || "/verify/step1";
                 log("Chuyển hướng về:", redir);
                 window.location.replace(redir);
-            }, 1000);
+            }, 800);
             return;
         }
 
-        // 4. Nếu ở trang /ad-return -> Trang đang tự xử lý hash Linkvertise
+        // 4. Nếu ở trang /ad-return -> Watchdog chuyển tiếp nếu router của trang bị chậm
         if (window.location.pathname.includes("/ad-return")) {
-            log("Đang ở trang /ad-return, hiển thị trạng thái hoàn tất...");
+            log("Đang ở trang /ad-return, theo dõi quá trình chuyển tiếp...");
             showToast("ComboWick Step", "Xác thực bước thành công! Đang chuyển tiếp...", true);
+
+            setTimeout(() => {
+                const p = window.location.pathname;
+                if (p.includes("step1")) {
+                    window.location.replace("https://keys.combowick.com/verify/step2");
+                } else if (p.includes("step2")) {
+                    window.location.replace("https://keys.combowick.com/verify/step3");
+                } else if (p.includes("step3")) {
+                    window.location.replace("https://keys.combowick.com/access-key");
+                }
+            }, 3000);
             return;
         }
 
@@ -825,15 +918,29 @@
             }
         }
 
-        // Watcher tự động bấm nút Checkpoint cho Step 1, Step 2, Step 3
+        // Tự động kích hoạt bấm nút Checkpoint ngay khi sẵn sàng (MutationObserver + Poller)
         function startAutoClickWatcher(targetStep) {
-            log("Kích hoạt Watcher tự động click nút Checkpoint...");
+            log(`Kích hoạt Watcher tự động click Checkpoint [${targetStep || ''}]...`);
             showToast("ComboWick Auto-Nav", "Đang theo dõi bộ đếm để tự động chuyển bước...");
 
             let clicked = false;
-            const timer = setInterval(() => {
-                if (clicked) return;
 
+            function triggerClick(btn) {
+                if (clicked || !btn || btn.disabled) return;
+                clicked = true;
+                log("Nút Checkpoint khả dụng! Kích hoạt click:", btn.textContent.trim());
+                showToast("ComboWick", "Đang tự động chuyển tiếp...", true);
+                
+                btn.focus();
+                btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+                btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+                btn.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+                btn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+                btn.click();
+            }
+
+            function checkButtons() {
+                if (clicked) return;
                 const btns = Array.from(document.querySelectorAll('main button, button'));
                 const actionBtn = btns.find(b => {
                     const txt = (b.textContent || "").toLowerCase();
@@ -850,11 +957,7 @@
 
                 if (actionBtn) {
                     if (!actionBtn.disabled) {
-                        clicked = true;
-                        clearInterval(timer);
-                        log("Nút Checkpoint đã sẵn sàng! Tự động nhấn:", actionBtn.textContent.trim());
-                        showToast("ComboWick", "Đang tự động chuyển tiếp...", true);
-                        actionBtn.click();
+                        triggerClick(actionBtn);
                     } else {
                         const txt = actionBtn.textContent.trim();
                         if (/\d+s/.test(txt) || txt.toLowerCase().includes("wait") || txt.toLowerCase().includes("chờ")) {
@@ -862,7 +965,28 @@
                         }
                     }
                 }
-            }, 350);
+            }
+
+            const obs = new MutationObserver(() => {
+                checkButtons();
+                if (clicked) obs.disconnect();
+            });
+            obs.observe(document.body || document.documentElement, {
+                attributes: true,
+                childList: true,
+                subtree: true,
+                attributeFilter: ['disabled', 'class']
+            });
+
+            const timer = setInterval(() => {
+                if (clicked) {
+                    clearInterval(timer);
+                    obs.disconnect();
+                    return;
+                }
+                checkButtons();
+                muteYouTubePlayer();
+            }, 300);
         }
 
         async function solveComboWickStepHash(stepNum) {
