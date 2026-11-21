@@ -56,7 +56,10 @@ if (!window.FastNav.utils) {
             try { body = await res.text(); } catch(err) { body = null; }
         }
         if (!res.ok) {
-            let msg = (body && typeof body === "object" && body.message) ? body.message : (typeof body === "string" ? body : `HTTP ${res.status}`);
+            if (body && typeof body === "object") {
+                return body;
+            }
+            let msg = (typeof body === "string" && body.length < 150) ? body : `HTTP ${res.status}`;
             throw new Error(msg);
         }
         return body;
@@ -177,7 +180,7 @@ if (!window.FastNav.utils) {
             }
 
             let tasks = (content.tasks || []).filter(t => 
-                (t.__typename === "WaitTask" || t.__typename === "AdTask") && 
+                (t.__typename === "WaitTask" || t.__typename === "AdTask" || t.__typename === "PremiumTask") && 
                 (t.status === "IN_PROGRESS" || t.status === "OPEN")
             );
 
@@ -201,8 +204,8 @@ if (!window.FastNav.utils) {
                         if (onProgress) onProgress(`Bộ đếm giờ Linkvertise: ${waitSec}s...`);
                     }
                     await sendGQL(M_COMPLETE_TASK, { identifier, task_id: t.id, task_args: taskArgs }, referer);
-                } else if (t.__typename === "AdTask") {
-                    log(`AdTask ID ${t.id}, hoàn tất...`);
+                } else {
+                    log(`Task ID ${t.id} (${t.__typename}), hoàn tất...`);
                     if (onProgress) onProgress("Đang xử lý bước quảng cáo...");
                     await sendGQL(M_COMPLETE_TASK, { identifier, task_id: t.id, task_args: taskArgs }, referer);
                 }
@@ -213,6 +216,9 @@ if (!window.FastNav.utils) {
         let finalRes = await sendGQL(Q_GET_CONTENT, { identifier, task_args: taskArgs }, referer);
         return finalRes?.data?.getContent?.url || (finalRes?.data?.getContent?.paste ? { paste: finalRes.data.getContent.paste } : null);
     }
+
+    // Xuất ra FastNav để các engine khác (như ComboWick) gọi được
+    window.FastNav.solveLinkvertise = solveLinkvertise;
 
     if (isLinkvertise) {
         log("Phát hiện trang Linkvertise");

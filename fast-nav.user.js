@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FastNav Suite Pro - Direct Navigation Helper
 // @namespace    http://tampermonkey.net/
-// @version      1.7.0
+// @version      1.7.1
 // @description  Tự động hỗ trợ điều hướng và giải quyết liên kết đích mượt mà (kiến trúc Modular Engine).
 // @author       khanghack222
 // @match        *://*.linkvertise.com/*
@@ -63,5 +63,5 @@
 
 (function() {
     'use strict';
-    console.log('%c[FastNav Suite]%c Loader initialized with 6 engines.', 'color:#10b981;font-weight:bold;', 'color:#38bdf8;');
+    console.log('%c[FastNav Suite]%c Loader initialized with 7 engines.', 'color:#10b981;font-weight:bold;', 'color:#38bdf8;');
 })();
